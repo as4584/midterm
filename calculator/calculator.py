@@ -1,3 +1,7 @@
+# calculator/calculator.py
+import commands.command as command
+import sys
+import os
 from utils.logger_config import CalculatorLogger
 from history.history_manager import CalculationHistory
 from plugins.plugin_loader import PluginLoader
