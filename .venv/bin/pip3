@@ -1,4 +1,4 @@
-#!/root/Midterm/.venv/bin/python
+#!/root/Midterm/.venv/bin/python3
 # -*- coding: utf-8 -*-
 import re
 import sys

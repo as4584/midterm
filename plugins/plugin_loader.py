@@ -1,58 +1,42 @@
 import os
 import importlib
-import inspect
-from plugins.base_plugin import CalculatorPlugin
+from utils.logger_config import CalculatorLogger
+from .base_plugin import CalculatorPlugin
 
 class PluginLoader:
-    def __init__(self, logger):
-        self.plugins = {}
+    """Class to load and manage calculator plugins."""
+
+    def __init__(self, logger: CalculatorLogger):
         self.logger = logger
-        
+        self.plugins = {}
+
+        self.load_plugins()
+
     def load_plugins(self):
-        """Load all plugins from the plugins directory"""
-        plugin_dir = os.path.dirname(os.path.abspath(__file__))
-        
-        # Get all Python files in the plugins directory
-        for filename in os.listdir(plugin_dir):
-            if filename.endswith('.py') and filename not in ['__init__.py', 'plugin_loader.py', 'base_plugin.py']:
-                try:
-                    # Convert filename to module name
-                    module_name = f"plugins.{filename[:-3]}"
-                    
-                    # Import the module
-                    module = importlib.import_module(module_name)
-                    
-                    # Find all classes in the module that inherit from CalculatorPlugin
-                    for name, obj in inspect.getmembers(module):
-                        if (inspect.isclass(obj) and 
-                            issubclass(obj, CalculatorPlugin) and 
-                            obj != CalculatorPlugin):
-                            
-                            # Instantiate the plugin
-                            plugin = obj()
-                            plugin_name = plugin.get_name()
-                            
-                            # Register the plugin
-                            self.plugins[plugin_name] = plugin
-                            self.logger.log_user_action(f"Loaded plugin: {plugin_name}")
-                            
-                except Exception as e:
-                    self.logger.log_error(f"Error loading plugin {filename}: {str(e)}")
-        
-        return self.plugins
-    
-    def get_available_operations(self):
-        """Return a list of available plugin operations"""
+        """Dynamically load plugins from the plugins directory."""
+        plugins_dir = os.path.dirname(__file__)
+        for filename in os.listdir(plugins_dir):
+            if filename.endswith('.py') and filename not in ['base_plugin.py', 'plugin_loader.py']:
+                module_name = filename[:-3]  # Remove .py extension
+                module = importlib.import_module(f'.{module_name}', package='plugins')
+                
+                # Register all classes that inherit from CalculatorPlugin
+                for attr in dir(module):
+                    cls = getattr(module, attr)
+                    if isinstance(cls, type) and issubclass(cls, CalculatorPlugin) and cls is not CalculatorPlugin:
+                        plugin_instance = cls()
+                        self.plugins[plugin_instance.get_name()] = plugin_instance
+                        self.logger.log(f"Loaded plugin: {plugin_instance.get_name()}")
+
+    def list_plugins(self):
+        """Return a list of available plugin names."""
         return list(self.plugins.keys())
-    
-    def get_plugin_description(self, plugin_name):
-        """Return the description of a specific plugin"""
-        if plugin_name in self.plugins:
-            return self.plugins[plugin_name].get_description()
-        return None
-    
-    def execute_plugin(self, plugin_name, num1, num2):
-        """Execute a specific plugin operation"""
-        if plugin_name in self.plugins:
-            return self.plugins[plugin_name].execute(num1, num2)
-        raise ValueError(f"Plugin {plugin_name} not found") 
+
+    def execute_plugin(self, command_name, num1, num2):
+        """Execute a plugin's command with the given numbers."""
+        if command_name in self.plugins:
+            return self.plugins[command_name].execute(num1, num2)
+        else:
+            raise ValueError(f"Plugin '{command_name}' not found.")
+        
+        

@@ -1,94 +1,95 @@
 # calculator/calculator.py
-import commands.command as command
-import sys
 import os
+import sys
+from pathlib import Path
+from dotenv import load_dotenv  # Import dotenv to load environment variables
+from config import config_loader
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Add the project root directory to Python path
+current_dir = Path(__file__).resolve().parent.parent
+sys.path.append(str(current_dir))
+
+#importing my modules
+from plugins.plugin_loader import PluginLoader
 from utils.logger_config import CalculatorLogger
 from history.history_manager import CalculationHistory
-from plugins.plugin_loader import PluginLoader
+from commands.add_command import AddCommand
+from commands.subtract_command import SubtractCommand
+from commands.multiply_command import MultiplyCommand
+from commands.divide_command import DivideCommand
+
+log_file_path = Config.LOG_FILE_PATH
+history_file_path = Config.HISTORY_FILE_PATH
 
 def main():
-    logger = CalculatorLogger()
-    history = CalculationHistory()
+    # Configure logger and history with environment variables
+    log_file_path = os.getenv('LOG_FILE_PATH', 'default_log.txt')
+    history_file_path = os.getenv('HISTORY_FILE_PATH', 'default_history.txt')
+    
+    logger = CalculatorLogger(log_file_path)
+    history = CalculationHistory(history_file_path)
     plugin_loader = PluginLoader(logger)
     
-    # Load plugins
+    # Load plugins on startup
     plugins = plugin_loader.load_plugins()
     
-    # Combine built-in operations with plugin operations
-    operations = {
-        'add': lambda x, y: x + y,
-        'subtract': lambda x, y: x - y,
-        'multiply': lambda x, y: x * y,
-        'divide': lambda x, y: x / y if y != 0 else None
-    }
-    operations.update(plugins)
-    
-    logger.log_user_action("Calculator started")
+    print("Welcome to Advanced Calculator!")
+    print("Available commands: add, subtract, multiply, divide, history, clear, list_plugins, exit")
     
     while True:
-        try:
-            # Get available operations including plugins
-            available_ops = list(operations.keys()) + ['history', 'clear', 'help', 'exit']
-            op_list = '/'.join(available_ops)
-            
-            user_input = input(f'[advanced calculator] What would you like to do? ({op_list}): ')
-            logger.log_user_action(f"User selected: {user_input}")
-            
-            if user_input == 'exit':
-                logger.log_user_action("Calculator ended")
-                print("Goodbye!")
-                break
-                
-            if user_input == 'history':
-                history.view_history()
-                continue
-                
-            if user_input == 'clear':
-                history.clear_history()
-                logger.log_user_action("History cleared")
-                continue
-                
-            if user_input == 'help':
-                print("\nAvailable operations:")
-                for op in operations:
-                    if op in plugins:
-                        print(f"{op}: {plugin_loader.get_plugin_description(op)}")
-                    else:
-                        print(f"{op}: Basic arithmetic operation")
-                continue
-                
-            if user_input in operations:
-                num1 = int(input('enter first number: '))
-                num2 = int(input('enter second number: '))
-                
-                try:
-                    if user_input == 'divide' and num2 == 0:
-                        error_msg = "Division by zero attempted"
-                        logger.log_error(error_msg)
-                        print("Error: Cannot divide by zero!")
-                        continue
-                    
-                    if user_input in plugins:
-                        result = plugin_loader.execute_plugin(user_input, num1, num2)
-                    else:
-                        result = operations[user_input](num1, num2)
-                    
-                    print(f"The answer is {result}")
-                    history.add_calculation(user_input, num1, num2, result)
-                    logger.log_calculation(user_input, num1, num2, result)
-                    
-                except Exception as e:
-                    error_msg = f"Calculation error: {str(e)}"
-                    logger.log_error(error_msg)
-                    print(f"Error: {error_msg}")
-            else:
-                logger.log_error(f"Invalid input: {user_input}")
-                print("Invalid input")
-                
-        except Exception as e:
-            error_msg = f"General error: {str(e)}"
-            logger.log_error(error_msg)
-            print(f"An error occurred: {error_msg}")
+        user_input = input("[advanced calculator] What operation would you like to do today? ").strip().lower()
+        
+        if user_input == "exit":
+            logger.log_user_action("Calculator ended")
+            print("Goodbye!")
+            break
+        elif user_input == "list_plugins":
+            print("Available plugins:", plugin_loader.list_plugins())
+            logger.log_user_action("Listed available plugins")
+        elif user_input == "history":
+            print(history.view_history())
+            logger.log_user_action("History viewed")
+        elif user_input == "clear":
+            history.clear_history()
+            logger.log_user_action("History cleared")
+            print("History cleared.")
+        elif user_input in ["add", "subtract", "multiply", "divide"]:
+            # Prompt user for numbers and execute the corresponding command
+            num1 = float(input("Enter first number: "))
+            num2 = float(input("Enter second number: "))
+            if user_input == "add":
+                command = AddCommand(num1, num2)
+            elif user_input == "subtract":
+                command = SubtractCommand(num1, num2)
+            elif user_input == "multiply":
+                command = MultiplyCommand(num1, num2)
+            elif user_input == "divide":
+                command = DivideCommand(num1, num2)
+            try:
+                result = command.execute()
+                print(f"The answer is {result}")
+                history.add_calculation(user_input, num1, num2, result)
+                logger.log_user_action(f"Executed {user_input} with {num1} and {num2} - Result: {result}")
+            except Exception as e:
+                print(f"Error: {e}")
+                logger.log_error(f"Error executing {user_input}: {e}")
+        elif user_input in plugins:
+            # Execute plugin commands
+            num1 = float(input("Enter a number: "))
+            try:
+                result = plugin_loader.execute_plugin(user_input, num1)
+                print(f"The answer is {result}")
+                history.add_calculation(user_input, num1, None, result)
+                logger.log_user_action(f"Executed plugin {user_input} with {num1} - Result: {result}")
+            except Exception as e:
+                print(f"Error: {e}")
+                logger.log_error(f"Error executing plugin {user_input}: {e}")
+        else:
+            print("Invalid input, please try again.")
+            logger.log_error(f"Invalid input: {user_input}")
 
 if __name__ == "__main__":
     main() 
